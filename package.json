@@ -10,11 +10,7 @@
   },
   "scripts": {
     "build": "tsc && npm run copy-skills",
-<<<<<<< C:/Users/ASUS/Desktop/Autoskills/package.json
     "copy-skills": "node -e \"const fs=require('fs');const p=require('path');const src='src/builtin-skills';const dst='dist/builtin-skills';if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).filter(f=>f.endsWith('.md')).forEach(f=>fs.copyFileSync(p.join(src,f),p.join(dst,f)))\"",
-=======
-    "copy-skills": "node -e \"const fs=require('fs');const p=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});fs.readdirSync(s,{withFileTypes:true}).forEach(e=>{const sp=p.join(s,e.name),dp=p.join(d,e.name);e.isDirectory()?cp(sp,dp):fs.copyFileSync(sp,dp)})}cp('src/builtin-skills','dist/builtin-skills')\"",
->>>>>>> C:/Users/ASUS/.windsurf/worktrees/Autoskills/Autoskills-2901b874/package.json
     "dev": "tsc --watch",
     "start": "node dist/index.js"
   },

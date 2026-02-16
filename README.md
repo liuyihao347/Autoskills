@@ -53,7 +53,6 @@ npm install
 npm run build
 ```
 
-<<<<<<< C:/Users/ASUS/Desktop/Autoskills/README.md
 ### CLI Commands
 
 Autoskills provides CLI commands for managing skills:
@@ -71,9 +70,6 @@ npx skills list
 ```
 
 ### 2. Configure your agent
-=======
-### 2. Configure Your Agent
->>>>>>> C:/Users/ASUS/.windsurf/worktrees/Autoskills/Autoskills-2901b874/README.md
 
 Add the Autoskills MCP server to your agent's config:
 
@@ -162,7 +158,6 @@ After completing a task, the agent calls Autoskills MCP tools:
 
 ## 🛠️ CLI Commands
 
-<<<<<<< C:/Users/ASUS/Desktop/Autoskills/README.md
 ### Built-in Skill Guides
 
 When `review_task` suggests creating or improving a skill, it automatically includes guidance:
@@ -171,9 +166,6 @@ When `review_task` suggests creating or improving a skill, it automatically incl
 - **skill-updater**: Guide for improving skills based on execution feedback
 
 ## Personal Skills Library
-=======
-Manage skills directly from the command line:
->>>>>>> C:/Users/ASUS/.windsurf/worktrees/Autoskills/Autoskills-2901b874/README.md
 
 ```bash
 npx skills init <skill-name>              # Create a new skill template
