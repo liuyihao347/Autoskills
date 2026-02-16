@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ Autoskills MCP
+# ⚡ Auto-agent-skills
 
 **Automatically build a reusable personal skills library for your AI agents.**
 
