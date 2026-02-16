@@ -1,0 +1,30 @@
+{
+  "name": "autoskills-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that automatically reviews completed tasks and helps AI agents build a reusable personal skills library",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "autoskills": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "ai",
+    "agent",
+    "skills",
+    "automation"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}
