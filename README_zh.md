@@ -14,15 +14,21 @@
 
 </div>
 
-```mermaid
-flowchart TD
-    A["Task completed"] --> B{"Used skill(s)?"}
-    B -->|No| C{"Reusable solution?"}
-    C -->|Yes| D["Suggest creating a new skill"]
-    C -->|No| E["Do nothing"]
-    B -->|Yes| F{"Worked well?"}
-    F -->|Yes| E
-    F -->|No| G["Suggest improving the skill"]
+```
+Task completed
+      │
+      ▼
+Used skill(s)? ──No──► Reusable solution? ──Yes──► Suggest creating a new skill
+      │                              │
+     Yes                             No
+      │                              │
+      ▼                              ▼
+Worked well? ──Yes──► Do nothing    Do nothing
+      │
+     No
+      │
+      ▼
+Suggest improving the skill
 ```
 
 ---
