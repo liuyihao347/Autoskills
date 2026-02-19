@@ -13,7 +13,6 @@
 *一个 MCP 服务器，帮助 AI Agent 自动发现、创建并持续改进可复用的技能 — 全程自动化。*
 
 </div>
-
 ![flowchart](flowchart.png)
 ---
 
