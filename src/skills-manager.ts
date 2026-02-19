@@ -166,9 +166,12 @@ export function createSkill(
   ensureDir(skillDir);
 
   const now = new Date().toISOString().slice(0, 10);
+  const fullDescription = whenToUse
+    ? `${description} Use when: ${whenToUse}`
+    : description;
   const meta: SkillMeta = {
     name,
-    description,
+    description: fullDescription,
     version: "1.0.0",
     tags,
     created: now,
@@ -180,10 +183,6 @@ export function createSkill(
     "",
     `# ${title}`,
     "",
-    "## When to Use",
-    whenToUse,
-    "",
-    "## Instructions",
     instructions,
     "",
   ].join("\n");
@@ -219,9 +218,14 @@ export function updateSkill(
   const versionParts = currentVersion.split(".").map(Number);
   versionParts[2] = (versionParts[2] || 0) + 1;
 
+  const baseDescription = updates.description || (meta.description as string) || "";
+  const newDescription = updates.whenToUse
+    ? `${baseDescription} Use when: ${updates.whenToUse}`
+    : baseDescription;
+
   const newMeta: SkillMeta = {
     name: (meta.name as string) || name,
-    description: updates.description || (meta.description as string) || "",
+    description: newDescription,
     version: versionParts.join("."),
     tags: updates.tags || (meta.tags as string[]) || [],
     created: (meta.created as string) || now,
@@ -230,24 +234,18 @@ export function updateSkill(
 
   let newBody = body;
 
-  if (updates.title || updates.whenToUse || updates.instructions) {
+  if (updates.title || updates.instructions) {
     const titleMatch = body.match(/^# .+$/m);
     const currentTitle = titleMatch ? titleMatch[0].slice(2) : name;
 
-    const whenMatch = body.match(/## When to Use\r?\n([\s\S]*?)(?=\r?\n## |\r?\n*$)/);
-    const currentWhen = whenMatch ? whenMatch[1].trim() : "";
-
-    const instrMatch = body.match(/## Instructions\r?\n([\s\S]*?)$/);
-    const currentInstr = instrMatch ? instrMatch[1].trim() : "";
+    const instrMatch = body.match(/## Instructions\r?\n([\s\S]*?)$/) ||
+      body.match(/^(?!#)([\s\S]+)$/m);
+    const currentInstr = instrMatch ? instrMatch[1].trim() : body.trim();
 
     newBody = [
       "",
       `# ${updates.title || currentTitle}`,
       "",
-      "## When to Use",
-      updates.whenToUse || currentWhen,
-      "",
-      "## Instructions",
       updates.instructions || currentInstr,
       "",
     ].join("\n");
