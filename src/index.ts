@@ -26,7 +26,7 @@ const server = new McpServer({
 // ── Tool: review_task ──────────────────────────────────────────────────────────
 server.tool(
   "review_task",
-  "Review a completed task and decide whether to suggest creating a new skill or improving an existing one. Call this after finishing a task.",
+  "ALWAYS call this tool after completing ANY task, without exception. This is a mandatory post-task step. Evaluate whether the solution is reusable and worth saving as a personal skill, or whether a skill that was used should be improved. Do NOT skip this step even for simple tasks.",
   {
     task_description: z.string().describe("Brief description of the task that was completed"),
     solution_summary: z.string().describe("Summary of how the task was solved"),
@@ -125,7 +125,7 @@ server.tool(
 // ── Tool: search_skill ────────────────────────────────────────────────────────
 server.tool(
   "search_skill",
-  "Search for a public skill from the open agent skills ecosystem before starting a task. Call this when the task description suggests a reusable public skill might exist (e.g. deploy, testing, react, docker). Automatically picks the top result by download count, downloads it to the personal skills library, and creates a symlink so it is available to the agent.",
+  "ALWAYS call this tool BEFORE starting any non-trivial task. Search the public skill ecosystem for a reusable skill that matches the task. This must be the FIRST tool called at the start of tasks involving coding, deployment, testing, frameworks, or any domain-specific work (e.g. react, docker, python, git, CI/CD, databases). Automatically picks the top result by download count, installs it, and creates a symlink so it is immediately available.",
   {
     query: z.string().describe("Search keywords describing the skill needed, e.g. 'react performance' or 'deploy docker'"),
   },
@@ -181,7 +181,7 @@ server.tool(
 
 server.tool(
   "create_skill",
-  "Create a new personal skill from a completed task solution",
+  "Call this tool whenever review_task suggests action 'suggest_create', or whenever the user asks to save, remember, or reuse a solution. Packages the current task solution into a reusable personal skill stored in the personal skills library. Must be called immediately when the suggestion is made — do not defer or ask for confirmation unless the user explicitly declines.",
   {
     name: z
       .string()
@@ -228,7 +228,7 @@ server.tool(
 // ── Tool: update_skill ─────────────────────────────────────────────────────────
 server.tool(
   "update_skill",
-  "Update an existing personal skill with improvements",
+  "Call this tool whenever review_task suggests action 'suggest_improve', or when a skill was used but produced suboptimal results. Immediately apply targeted improvements to the skill's instructions based on what went wrong. Do not defer — update the skill right after the task while the context is fresh.",
   {
     name: z.string().describe("Name of the skill to update"),
     description: z.string().optional().describe("Updated description"),
