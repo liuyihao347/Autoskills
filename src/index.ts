@@ -26,51 +26,32 @@ const server = new McpServer({
 // ── Tool: review_task ──────────────────────────────────────────────────────────
 server.tool(
   "review_task",
-  "ALWAYS call this tool after completing ANY task, without exception. This is a mandatory post-task step. Evaluate whether the solution is reusable and worth saving as a personal skill, or whether a skill that was used should be improved. Do NOT skip this step even for simple tasks.",
+  "After completing a task, call this tool to check if the solution is worth saving as a reusable skill. This helps build your personal skills library over time.",
   {
-    task_description: z.string().describe("Brief description of the task that was completed"),
-    solution_summary: z.string().describe("Summary of how the task was solved"),
+    task_description: z.string().describe("What task was completed"),
+    solution_summary: z.string().describe("How the task was solved"),
     skills_used: z
       .array(z.string())
       .optional()
-      .describe("Names of personal skills that were used during this task, if any"),
-    skill_execution_smooth: z
-      .boolean()
-      .optional()
-      .describe("Whether the skills used executed smoothly and successfully. Only relevant if skills_used is non-empty"),
+      .describe("Skills used in this task, if any"),
     skill_issues: z
       .string()
       .optional()
-      .describe("Description of issues encountered with the skills used, if any"),
+      .describe("Any issues encountered with the skills"),
   },
-  async ({ task_description, solution_summary, skills_used, skill_execution_smooth, skill_issues }) => {
+  async ({ task_description, solution_summary, skills_used, skill_issues }) => {
     const existingSkills = listSkills();
     const usedSkills = skills_used ?? [];
     const hasUsedSkills = usedSkills.length > 0;
+    const hasIssues = skill_issues && skill_issues.trim().length > 0;
 
-    if (hasUsedSkills) {
-      if (skill_execution_smooth === true) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                action: "none",
-                reason:
-                  "The skill(s) used performed well during this task. No changes needed.",
-                skills_reviewed: usedSkills,
-              }),
-            },
-          ],
-        };
-      }
-
+    if (hasUsedSkills && hasIssues) {
       const skillDetails = usedSkills
         .map((name) => {
           const skill = getSkill(name);
           return skill
             ? `- **${skill.meta.name}**: ${skill.meta.description}`
-            : `- **${name}**: (not found in personal skills)`;
+            : `- **${name}**: (skill not found)`;
         })
         .join("\n");
 
@@ -79,43 +60,31 @@ server.tool(
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({
-              action: "suggest_improve",
-              message: `The following skill(s) were used but did not execute smoothly:\n\n${skillDetails}\n\nIssues encountered: ${skill_issues || "unspecified"}\n\nWould you like me to improve this skill to better handle this type of task?`,
-              skills_to_improve: usedSkills,
-              issues: skill_issues || "",
-              task_description,
-              solution_summary,
-              guide: updaterGuide ? {
-                name: updaterGuide.name,
-                description: updaterGuide.description,
-                instructions: updaterGuide.content,
-              } : null,
-            }),
+            text: `Skills used had issues:\n\n${skillDetails}\n\nIssues: ${skill_issues}\n\n**Action**: Improve these skills using update_skill`,
           },
         ],
       };
     }
 
-    const existingNames = existingSkills.map((s) => s.name).join(", ") || "(none)";
+    if (hasUsedSkills && !hasIssues) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Skills used worked well: ${usedSkills.join(", ")}. No changes needed.`,
+          },
+        ],
+      };
+    }
 
+    const existingNames = existingSkills.map((s) => s.name).join(", ") || "none";
     const creatorGuide = getSkillCreatorGuide();
+
     return {
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify({
-            action: "suggest_create",
-            message: `This task was completed without using any personal skills. The solution may be worth packaging as a reusable skill.\n\n**Task**: ${task_description}\n**Solution**: ${solution_summary}\n\nExisting personal skills: ${existingNames}\n\nWould you like me to create a new personal skill from this solution so it can be reused in similar tasks?`,
-            task_description,
-            solution_summary,
-            existing_skills: existingSkills.map((s) => s.name),
-            guide: creatorGuide ? {
-              name: creatorGuide.name,
-              description: creatorGuide.description,
-              instructions: creatorGuide.content,
-            } : null,
-          }),
+          text: `Task completed without using skills.\n\n**Task**: ${task_description}\n**Solution**: ${solution_summary}\n\n**Existing skills**: ${existingNames}\n\n**Action**: Consider creating a new skill with create_skill to make this solution reusable`,
         },
       ],
     };
@@ -163,8 +132,8 @@ server.tool(
           installed,
           install_error: installError || undefined,
           message: installed
-            ? `Skill "${top.package}" installed and ready. Use it for this task, then call review_task when done.`
-            : `Found skill "${top.package}" but installation failed: ${installError}. You can install manually: npx skills add ${top.package} -g -y`,
+            ? `Skill "${top.package}" installed and ready. Use it for this task. After completing the task, call review_task to evaluate if this solution should be saved.`
+            : `Found skill "${top.package}" but installation failed: ${installError}. You can install manually with: npx skills add ${top.package}`,
         }) }],
       };
     } catch (err) {

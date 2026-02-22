@@ -1,5 +1,5 @@
 {
-  "name": "autoskills-mcp",
+  "name": "autoskill",
   "version": "1.0.0",
   "description": "MCP server that automatically reviews completed tasks and helps AI agents build a reusable personal skills library",
   "main": "dist/index.js",

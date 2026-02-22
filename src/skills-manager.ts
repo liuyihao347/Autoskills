@@ -190,6 +190,8 @@ export function createSkill(
   const skillFile = path.join(skillDir, "SKILL.md");
   fs.writeFileSync(skillFile, content, "utf-8");
 
+  createSymlinkForSkill(name);
+
   return skillFile;
 }
 
@@ -266,9 +268,52 @@ export function deleteSkill(name: string): boolean {
   return true;
 }
 
+function findSkillInPlugins(baseDir: string, skillName: string): string[] {
+  const results: string[] = [];
+  const pluginsDir = path.join(baseDir, "plugins");
+  
+  if (!fs.existsSync(pluginsDir)) return results;
+  
+  try {
+    const pluginEntries = fs.readdirSync(pluginsDir, { withFileTypes: true });
+    for (const entry of pluginEntries) {
+      if (!entry.isDirectory()) continue;
+      
+      // Check common subdirectories in plugins
+      const possiblePaths = [
+        path.join(pluginsDir, entry.name, "skills", skillName),
+        path.join(pluginsDir, entry.name, "agents", skillName),
+        path.join(pluginsDir, entry.name, skillName),
+      ];
+      
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          results.push(p);
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  
+  return results;
+}
+
 export interface PublicSkillResult {
   package: string;
   url: string;
+  installs: number;
+}
+
+function parseInstallCount(installStr: string): number {
+  const clean = installStr.toLowerCase().replace(/,/g, '');
+  if (clean.endsWith('k')) {
+    return parseFloat(clean.slice(0, -1)) * 1000;
+  }
+  if (clean.endsWith('m')) {
+    return parseFloat(clean.slice(0, -1)) * 1000000;
+  }
+  return parseInt(clean, 10) || 0;
 }
 
 export function searchPublicSkills(query: string): Promise<PublicSkillResult[]> {
@@ -288,16 +333,19 @@ export function searchPublicSkills(query: string): Promise<PublicSkillResult[]> 
       const clean = stdout.replace(/\x1B\[[0-9;]*[mGKHFJA-Za-z]/g, "").replace(/\r/g, "");
       const lines = clean.split("\n").filter(l => l.trim() !== "");
       for (let i = 0; i < lines.length; i++) {
-        // Match: owner/repo@skill-name [N installs]
-        const pkgMatch = lines[i].match(/^([\w.-]+\/[\w.-]+@[\w./ -]+?)(?:\s+\d+\s+installs?)?$/);
+        // Match: owner/repo@skill-name [N installs] or [N.K installs]
+        const pkgMatch = lines[i].match(/^([\w.-]+\/[\w.-]+@[\w./ -]+?)\s+(\d+(?:\.\d+)?[KkMm]?)\s+installs?$/);
         if (pkgMatch) {
           const pkg = pkgMatch[1].trim();
+          const installCount = parseInstallCount(pkgMatch[2]);
           // Next non-empty line may be └ https://...
           const nextLine = lines[i + 1] ? lines[i + 1].trim().replace(/^[└\\]\s*/, "") : "";
           const url = nextLine.startsWith("https://") ? nextLine : `https://skills.sh/${pkg.replace("@", "/")}`;
-          results.push({ package: pkg, url });
+          results.push({ package: pkg, url, installs: installCount });
         }
       }
+      // Sort by install count descending (highest first)
+      results.sort((a, b) => b.installs - a.installs);
       resolve(results);
     });
 
@@ -307,26 +355,91 @@ export function searchPublicSkills(query: string): Promise<PublicSkillResult[]> 
 
 export function installPublicSkill(pkg: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["skills", "add", pkg, "-g", "-y"], {
+    // Parse package format: owner/repo@skill-name
+    const match = pkg.match(/^([\w.-]+)\/([\w.-]+)@([\w.-]+)$/);
+    if (!match) {
+      reject(new Error(`Invalid package format: ${pkg}. Expected: owner/repo@skill-name`));
+      return;
+    }
+
+    const [, owner, repo, skillName] = match;
+    const skillsDir = getSkillsDir();
+    const targetDir = path.join(skillsDir, skillName);
+    const tempDir = path.join(os.tmpdir(), `skills-install-${Date.now()}`);
+
+    // Clone the repository
+    const cloneProc = spawn("git", ["clone", `https://github.com/${owner}/${repo}.git`, tempDir], {
       stdio: "pipe",
-      shell: true,
     });
 
-    let stdout = "";
-    let stderr = "";
-    proc.stdout?.on("data", (data) => { stdout += data.toString(); });
-    proc.stderr?.on("data", (data) => { stderr += data.toString(); });
+    let cloneError = "";
+    cloneProc.stderr?.on("data", (data) => { cloneError += data.toString(); });
 
-    proc.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(`npx skills add failed (code ${code}): ${stderr || stdout}`));
+    cloneProc.on("close", (cloneCode) => {
+      if (cloneCode !== 0) {
+        reject(new Error(`Failed to clone repository: ${cloneError}`));
+        return;
       }
+
+      // Find the skill directory in the cloned repo
+      const skillSourceDir = path.join(tempDir, skillName);
+      if (!fs.existsSync(skillSourceDir)) {
+        // Try alternative locations - search recursively for skill directory
+        const altLocations = [
+          path.join(tempDir, "skills", skillName),
+          path.join(tempDir, "src", skillName),
+          path.join(tempDir, "packages", skillName),
+          path.join(tempDir, "plugins", skillName),
+          path.join(tempDir, "agents", skillName),
+          // Search in plugins subdirectories
+          ...findSkillInPlugins(tempDir, skillName),
+        ];
+        let foundDir = null;
+        for (const alt of altLocations) {
+          if (fs.existsSync(alt)) {
+            foundDir = alt;
+            break;
+          }
+        }
+        if (!foundDir) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+          reject(new Error(`Skill "${skillName}" not found in repository ${owner}/${repo}`));
+          return;
+        }
+        // Copy from alternative location
+        copyDir(foundDir, targetDir);
+      } else {
+        // Copy skill directory to personal skills
+        copyDir(skillSourceDir, targetDir);
+      }
+
+      // Clean up temp directory
+      fs.rmSync(tempDir, { recursive: true, force: true });
+
+      // Create symlink in .agents/skills
+      createSymlinkForSkill(skillName);
+
+      resolve(targetDir);
     });
 
-    proc.on("error", (err) => reject(new Error(`Failed to run npx skills add: ${err.message}`)));
+    cloneProc.on("error", (err) => reject(new Error(`Failed to run git clone: ${err.message}`)));
   });
+}
+
+function copyDir(src: string, dest: string): void {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDir(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 export function getAgentsSkillsDir(): string {
