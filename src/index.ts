@@ -12,6 +12,9 @@ import {
   searchPublicSkills,
   installPublicSkill,
   createSymlinkForSkill,
+  searchLocalSkills,
+  listGlobalSkills,
+  getAgentsSkillsDir,
 } from "./skills-manager.js";
 import {
   getSkillCreatorGuide,
@@ -339,15 +342,23 @@ server.tool(
   "Check what skills are available before starting a task, or to see your personal skills library contents.",
   {},
   async () => {
-    const skills = listSkills();
+    const personalSkills = listSkills();
+    const globalSkills = listGlobalSkills();
+    
     return {
       content: [
         {
           type: "text" as const,
           text: JSON.stringify({
-            skills_dir: getSkillsDir(),
-            count: skills.length,
-            skills,
+            global_skills: {
+              directory: getAgentsSkillsDir(),
+              count: globalSkills.length,
+            },
+            personal_skills: {
+              directory: getSkillsDir(),
+              count: personalSkills.length,
+              names: personalSkills.map(s => s.name),
+            }
           }),
         },
       ],

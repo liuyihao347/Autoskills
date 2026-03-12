@@ -498,6 +498,62 @@ export function getAgentsSkillsDir(): string {
   return process.env.AGENTS_SKILLS_DIR || path.join(os.homedir(), ".agents", "skills");
 }
 
+export function listGlobalSkills(): string[] {
+  const dir = getAgentsSkillsDir();
+  if (!fs.existsSync(dir)) return [];
+  
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const skills: string[] = [];
+  
+  for (const entry of entries) {
+    if (entry.isDirectory() || entry.isSymbolicLink()) {
+      skills.push(entry.name);
+    }
+  }
+  
+  return skills;
+}
+
+export interface LocalSkillResult {
+  name: string;
+  path: string;
+}
+
+export function searchLocalSkills(query: string): LocalSkillResult[] {
+  const dir = getAgentsSkillsDir();
+  if (!fs.existsSync(dir)) return [];
+  
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const results: LocalSkillResult[] = [];
+  const queryLower = query.toLowerCase();
+  
+  for (const entry of entries) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+    
+    const skillName = entry.name;
+    const skillPath = path.join(dir, skillName);
+    const skillMd = path.join(skillPath, "SKILL.md");
+    
+    if (skillName.toLowerCase().includes(queryLower)) {
+      results.push({ name: skillName, path: skillPath });
+      continue;
+    }
+    
+    if (fs.existsSync(skillMd)) {
+      try {
+        const content = fs.readFileSync(skillMd, "utf-8").toLowerCase();
+        if (content.includes(queryLower)) {
+          results.push({ name: skillName, path: skillPath });
+        }
+      } catch {
+        // Ignore read errors
+      }
+    }
+  }
+  
+  return results;
+}
+
 export function createSymlinkForSkill(skillName: string): void {
   const skillsDir = getSkillsDir();
   const agentsDir = getAgentsSkillsDir();
