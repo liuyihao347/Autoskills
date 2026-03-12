@@ -78,11 +78,11 @@ The agent handles everything automatically:
 
 | Tool | When it's called | What it does |
 |:---|:---|:---|
-| `search_skill` | Before task execution | Searches the public skill ecosystem, installs the top result, creates a symlink |
+| `search_skill` | Before task execution | Searches local global skills (`~/.agents/skills/`), then falls back to public ecosystem |
 | `review_task` | After task completion | Evaluates the solution and suggests creating or improving a skill |
 | `create_skill` | When creating a new skill | Writes a new `SKILL.md` to the personal library and links it |
 | `update_skill` | When improving a skill | Updates an existing skill's instructions, description, or metadata |
-| `list_skills` | On demand | Lists all skills in the personal library |
+| `list_skills` | On demand | Lists skill counts for global skills and names for personal skills |
 | `get_skill` | On demand | Reads the full content of a specific skill |
 
 ---
