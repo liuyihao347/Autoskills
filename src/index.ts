@@ -5,7 +5,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import {
   listSkills,
-  getSkill,
   createSkill,
   updateSkill,
   getSkillsDir,
@@ -20,6 +19,7 @@ import {
   getSkillCreatorGuide,
   getSkillUpdaterGuide,
   getReviewTaskGuide,
+  getSearchSkillGuide,
 } from "./builtin-skills.js";
 
 const server = new McpServer({
@@ -142,90 +142,42 @@ server.tool(
 // ── Tool: search_skill ────────────────────────────────────────────────────────
 server.tool(
   "search_skill",
-  "When starting a new task, first decide which skill domain would help most, then call this to find and install relevant skills. The tool searches the public skill ecosystem, installs the best match, and tells you which execution stages should reference it (adapt to your context, don't copy blindly).",
+  "When starting a new task, call this to get the standard workflow for analyzing requirements and searching for relevant skills.",
   {
-    task_context: z.string().optional().describe("Task summary from the user request. MUST BE TRANSLATED TO ENGLISH for better search results."),
-    candidate_skill: z.string().optional().describe("One candidate skill focus decided by the agent before search. MUST BE IN ENGLISH."),
-    query: z.string().optional().describe("Legacy fallback query (for compatibility). MUST BE IN ENGLISH."),
+    task_context: z.string().optional().describe("Task summary from the user request."),
+    candidate_skill: z.string().optional().describe("One candidate skill focus decided by the agent before search."),
+    query: z.string().optional().describe("Legacy fallback query (for compatibility)."),
   },
   async ({ task_context, candidate_skill, query }) => {
-    try {
-      const sourceContext = task_context || query || "";
-      if (!sourceContext.trim() && !candidate_skill?.trim()) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({
-            found: false,
-            message: "search_skill requires task_context (or legacy query), and should include one candidate_skill focus when possible.",
-          }) }],
-        };
-      }
+    const searcherGuide = getSearchSkillGuide();
 
-      const decision = inferSkillFocus(sourceContext, candidate_skill);
-
-      // Search remote public skills directly (local search removed)
-      const results = await searchPublicSkills(decision.searchQuery);
-
-      if (results.length === 0) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({
-            found: false,
-            task_context: sourceContext,
-            candidate_skill: candidate_skill || null,
-            search_query: decision.searchQuery,
-            suggest: decision.suggest,
-            usage_note: "Use skills as reference and adapt to current constraints; do not copy verbatim.",
-            message: `No public skills found for query "${decision.searchQuery}". Proceed with general capabilities.`,
-          }) }],
-        };
-      }
-
-      const top = results[0];
-      let installed = false;
-      let installError = "";
-      let skillDescription = "";
-      let usageRecommendation = "";
-
-      try {
-        await installPublicSkill(top.package);
-        const skillName = top.package.split("@")[1];
-        createSymlinkForSkill(skillName);
-        installed = true;
-
-        // Read skill description after successful installation
-        const skill = getSkill(skillName);
-        if (skill) {
-          skillDescription = skill.meta.description;
-          usageRecommendation = `Review skill description: "${skillDescription}". If this matches your task needs, use this skill; otherwise, proceed with general capabilities.`;
-        }
-      } catch (err) {
-        installError = (err as Error).message;
-      }
-
+    if (!searcherGuide) {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({
-          found: true,
-          task_context: sourceContext,
-          candidate_skill: candidate_skill || null,
-          search_query: decision.searchQuery,
-          top_result: top,
-          all_results: results,
-          installed,
-          install_error: installError || undefined,
-          skill_description: skillDescription || undefined,
-          usage_recommendation: usageRecommendation || undefined,
-          message: installed
-            ? `Skill "${top.package}" installed. ${usageRecommendation || "Reference it in later execution stages, then call review_task after completion."}`
-            : `Found skill "${top.package}" but installation failed: ${installError}. You can install manually with: npx skills add ${top.package}`,
-        }) }],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({
-          found: false,
-          message: `Search failed: ${(err as Error).message}`,
-        }) }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              error: "search-skill builtin skill not found",
+            }),
+          },
+        ],
       };
     }
+
+    const sourceContext = task_context || query || "";
+    
+    return {
+      content: [
+        {
+          type: "resource" as const,
+          resource: {
+            uri: `builtin://search-skill/SKILL.md`,
+            mimeType: "text/markdown",
+            text: `${searcherGuide.content}\n\n---\n\n**Current Task Context:**\n- Context: ${sourceContext || "Not provided"}\n- Candidate Focus: ${candidate_skill || "Not provided"}`,
+          },
+        },
+      ],
+    };
   }
 );
 
@@ -340,46 +292,6 @@ server.tool(
               count: personalSkills.length,
               names: personalSkills.map(s => s.name),
             }
-          }),
-        },
-      ],
-    };
-  }
-);
-
-// ── Tool: get_skill ────────────────────────────────────────────────────────────
-server.tool(
-  "get_skill",
-  "Read a specific skill's full instructions before using it, or to check what a skill contains.",
-  {
-    name: z.string().describe("Name of the skill to read"),
-  },
-  async ({ name }) => {
-    const skill = getSkill(name);
-    if (!skill) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              success: false,
-              error: `Skill "${name}" not found.`,
-            }),
-          },
-        ],
-      };
-    }
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            skill: {
-              ...skill.meta,
-              content: skill.content,
-              path: skill.filePath,
-            },
           }),
         },
       ],
