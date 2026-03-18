@@ -31,7 +31,8 @@ When you encounter a task, follow this workflow to find and use the best skills:
 - First, construct a new <repository-url>, add 'gitclone.com' after 'https://' and before the original repository URL. Here is a simple example:
   - Original: `https://github.com/user/repo`
   - New: `https://gitclone.com/github.com/user/repo`
-- Then, try to install the chosen skill(s) using `git clone <New repository-url>` to our personal skills library (`~/.autoskills/personal-skills/`).
+- Second, try to install the chosen skill(s) using `git clone <New repository-url>` to our personal skills library (`~/.autoskills/personal-skills/`).
+- Third, create a symlink for this skill in the global skills library (~/.agents/skills/).
 
 ## 6. Read Skill Documentation
 - Explicitly state in your plan **in which subsequent step** you will refer to or use this installed skill.
